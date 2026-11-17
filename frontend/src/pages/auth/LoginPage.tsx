@@ -196,11 +196,11 @@ export const LoginPage: React.FC = () => {
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="login-correo" className="block text-xs font-semibold text-slate-700 mb-1">
                   Correo Institucional
                 </label>
                 <input
-                  type="email"
+                  id="login-correo" name="correo" type="email"
                   autoComplete="username"
                   value={correo}
                   onChange={(e) => {
@@ -219,12 +219,12 @@ export const LoginPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="login-contrasena" className="block text-xs font-semibold text-slate-700 mb-1">
                   Contraseña
                 </label>
                 <div className="relative">
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    id="login-contrasena" name="contrasena" type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     value={contrasena}
                     onChange={(e) => {
@@ -233,14 +233,16 @@ export const LoginPage: React.FC = () => {
                     }}
                     placeholder="••••••••"
                     aria-invalid={!!errores.contrasena}
-                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-[#002238] focus:outline-none text-slate-800 pr-9 ${
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-[#002238] focus:outline-none text-slate-800 pr-12 ${
                       errores.contrasena ? 'border-red-400' : 'border-slate-200'
                     }`}
                   />
                   <button
                     type="button"
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    aria-pressed={showPassword}
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    className="absolute right-0 top-0 flex h-full w-11 items-center justify-center rounded-xl text-slate-600 hover:text-slate-800 cursor-pointer"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       {showPassword ? (
@@ -310,7 +312,7 @@ export const LoginPage: React.FC = () => {
                 </div>
               </div>
               <button
-                onClick={() => setShowForgotModal(false)}
+                aria-label="Cerrar recuperación de contraseña" onClick={() => setShowForgotModal(false)}
                 className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer"
               >
                 &times;
@@ -342,12 +344,12 @@ export const LoginPage: React.FC = () => {
 
               {recoveryStep === 1 ? (
                 <div className="text-left">
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  <label htmlFor="recovery-correo" className="block text-[11px] font-semibold text-slate-700 mb-1">
                     Correo institucional
                   </label>
                   <input
                     type="email"
-                    value={recoveryEmail}
+                    id="recovery-correo" value={recoveryEmail}
                     onChange={(e) => setRecoveryEmail(e.target.value)}
                     placeholder="u00000000@utp.edu.pe o r.docente@utp.edu.pe"
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#002238] focus:outline-none"

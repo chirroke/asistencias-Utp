@@ -132,6 +132,68 @@ test('flujo docente: sesión, QR, WebSocket, asistencia manual, historial y cier
     res = respuesta();
     await controller.cerrarSesionManual({ ...req, params: { id: sesionId } }, res);
     assert.equal(res.statusCode, 200, res.body?.error);
+
+    // Programar, mover, validar acceso/cruces y abrir respetando el horario.
+    const programacion = require('../src/controllers/programacionController');
+    const manana = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const base = { fecha: manana, horaInicio: '08:00', horaFin: '10:00', motivo: 'Cambio de horario por actividad académica' };
+    const programarReq = { user: req.user, params: { cursoId: curso.rows[0].id }, body: base };
+    res = respuesta();
+    await programacion.guardarProgramacion(programarReq, res);
+    assert.equal(res.statusCode, 201, res.body?.error);
+    const programadaId = res.body.sesion.id;
+    res = respuesta();
+    await programacion.guardarProgramacion(programarReq, res);
+    assert.equal(res.statusCode, 409, 'rechaza horarios superpuestos');
+    res = respuesta();
+    await programacion.guardarProgramacion({ ...programarReq, user: { id: alumnoUser.rows[0].id }, body: { ...base, sesionId: programadaId } }, res);
+    assert.equal(res.statusCode, 403, 'rechaza otro propietario');
+    res = respuesta();
+    await programacion.guardarProgramacion({ ...programarReq, body: { ...base, sesionId, horaInicio: '12:00', horaFin: '14:00' } }, res);
+    assert.equal(res.statusCode, 409, 'conserva la sesión cerrada');
+    res = respuesta();
+    await programacion.guardarProgramacion({ ...programarReq, body: { ...base, sesionId: programadaId, horaInicio: '10:00', horaFin: '12:00' } }, res);
+    assert.equal(res.statusCode, 200, res.body?.error);
+    const auditoria = (await client.query("SELECT datos_antes,datos_despues FROM bitacora_auditoria WHERE entidad_id=$1 AND accion='actualizar'", [programadaId])).rows;
+    assert.equal(auditoria.length, 1);
+    assert.equal(auditoria[0].datos_despues.operacion, 'reprogramar');
+    assert.notEqual(auditoria[0].datos_antes.hora_inicio, auditoria[0].datos_despues.hora_inicio);
+    res = respuesta();
+    await controller.abrirSesion({ ...req, body: { curso_id: curso.rows[0].id } }, res);
+    assert.equal(res.statusCode, 409, 'no permite abrir antes del horario');
+    await client.query("UPDATE sesion_clase SET hora_inicio=now()-interval '5 minutes',hora_fin_programada=now()+interval '55 minutes' WHERE id=$1", [programadaId]);
+    res = respuesta();
+    await controller.abrirSesion({ ...req, body: { curso_id: curso.rows[0].id } }, res);
+    assert.equal(res.statusCode, 200, res.body?.error);
+    assert.equal(res.body.sesion.id, programadaId, 'activa la misma sesión programada');
+    assert.equal(res.body.sesion.estado, 'activa');
+    res = respuesta();
+    await programacion.guardarProgramacion({ ...programarReq, body: { ...base, sesionId: programadaId } }, res);
+    assert.equal(res.statusCode, 409, 'no mueve sesiones activas');
+
+    // General report counts real records once, including withdrawn students.
+    const { construirGeneral, descargarGeneral } = require('../src/controllers/reporteGeneralController');
+    await client.query("UPDATE matricula SET estado='retirada' WHERE curso_id=$1 AND alumno_id=$2", [curso.rows[0].id,alumnoUser.rows[0].id]);
+    const general = await construirGeneral({ cursoId: curso.rows[0].id });
+    assert.equal(general.alumnos.length, 1);
+    assert.equal(general.alumnos[0].sesiones, 1);
+    assert.equal(general.alumnos[0].presentes, 1);
+    assert.equal(general.alumnos[0].asistencia, 1);
+    const vacio = await construirGeneral({ cursoId: curso.rows[0].id, desde: manana });
+    assert.equal(vacio.alumnos[0].sesiones, 0);
+    assert.equal(vacio.alumnos[0].asistencia, 0);
+    for (const formato of ['pdf','xlsx']) {
+      const download = { ...respuesta(), set(headers) { this.headers=headers; }, end(data) { this.data=data; } };
+      await descargarGeneral({ user: { rol:'admin' }, query: { cursoId: curso.rows[0].id, formato } }, download);
+      assert.equal(download.statusCode, 200, download.body?.error);
+      assert.equal(download.data.subarray(0, formato==='pdf' ? 5 : 2).toString(), formato==='pdf' ? '%PDF-' : 'PK');
+    }
+    res = respuesta();
+    await descargarGeneral({ user: { rol:'docente' }, query: {} }, res);
+    assert.equal(res.statusCode, 403);
+    res = respuesta();
+    await descargarGeneral({ user: { rol:'admin' }, query: { desde:'2026-02-30' } }, res);
+    assert.equal(res.statusCode, 400);
   } finally {
     if (transactionStarted) await client.query('ROLLBACK');
     pool.query = queryOriginal;

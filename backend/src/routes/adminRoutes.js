@@ -5,6 +5,7 @@ const { listarDocentes, actualizarEstadoDocente, listarAlumnos, listarCursosAdmi
 const { listarJustificaciones, resolverJustificacion, descargarEvidencia } = require('../controllers/justificacionController');
 
 router.use(verifyToken, verificarRol(['admin']));
+router.get('/reporte', require('../controllers/reporteGeneralController').descargarGeneral);
 router.get('/resumen', obtenerResumenAdmin);
 router.get('/docentes', listarDocentes);
 router.patch('/docentes/:docenteId/estado', actualizarEstadoDocente);

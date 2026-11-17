@@ -35,6 +35,12 @@ const COLUMNAS = [
 
 const generarPdf = (datos) => {
   const { curso, rango, generado, sesiones, alumnos, advertenciaPct, criticoPct } = datos;
+  const columnas = datos.general ? [
+    { titulo: 'Código / Sec.', ancho: 88, valor: (c) => `${c.codigo} / ${c.seccion}` },
+    { titulo: 'Curso', ancho: 155, valor: (c) => c.nombre },
+    { titulo: 'Ses.', ancho: 35, valor: (c) => c.sesiones },
+    ...COLUMNAS.slice(2, 7).map((c) => ({ ...c, ancho: c.titulo === '% Asist.' ? 62 : 43 })),
+  ] : COLUMNAS;
   const paginas = [];
   let ops = [];
   let y = 0;
@@ -49,10 +55,10 @@ const generarPdf = (datos) => {
   const rect = (x, yy, w, h, relleno) => ops.push(`${relleno} rg ${x.toFixed(2)} ${yy.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re f`);
 
   const encabezadoTabla = () => {
-    const anchoTotal = COLUMNAS.reduce((s, c) => s + c.ancho, 0);
+    const anchoTotal = columnas.reduce((s, c) => s + c.ancho, 0);
     rect(MARGEN, y - 4, anchoTotal, 18, AZUL);
     let x = MARGEN;
-    for (const c of COLUMNAS) { texto(x + 3, y + 1, c.titulo, { tamano: 8.5, negrita: true, color: '1 g', ancho: c.ancho - 6, alinear: c.alinear }); x += c.ancho; }
+    for (const c of columnas) { texto(x + 3, y + 1, c.titulo, { tamano: 8.5, negrita: true, color: '1 g', ancho: c.ancho - 6, alinear: c.alinear }); x += c.ancho; }
     y -= 20;
   };
 
@@ -62,11 +68,11 @@ const generarPdf = (datos) => {
     y = ALTO - MARGEN;
     if (primera) {
       rect(0, ALTO - 12, ANCHO, 12, ROJO);
-      texto(MARGEN, y - 8, 'Reporte de asistencia', { tamano: 18, negrita: true, color: AZUL });
+      texto(MARGEN, y - 8, datos.general ? 'Reporte general de asistencia' : 'Reporte de asistencia', { tamano: 18, negrita: true, color: AZUL });
       y -= 28;
       const meta = [
-        ['Curso', `${curso.codigo} - ${curso.nombre} (Sección ${curso.seccion})`],
-        ['Docente', curso.docente || '-'],
+        [datos.general ? 'Ámbito' : 'Curso', datos.general ? 'Cursos del periodo académico activo' : `${curso.codigo} - ${curso.nombre} (Sección ${curso.seccion})`],
+        [datos.general ? 'Criterio' : 'Docente', datos.general ? '% = (presentes + tardanzas) / registros; sin datos: 0%' : curso.docente || '-'],
         ['Periodo', curso.periodo || '-'],
         ['Rango', `${rango.desde ? formatearFecha(rango.desde) : 'Inicio'} a ${rango.hasta ? formatearFecha(rango.hasta) : 'hoy'} · ${sesiones.length} sesiones cerradas`],
         ['Generado', generado.toLocaleString('es-PE', { timeZone: 'America/Lima' })],
@@ -74,7 +80,7 @@ const generarPdf = (datos) => {
       for (const [etiqueta, valor] of meta) { texto(MARGEN, y, `${etiqueta}:`, { negrita: true, tamano: 9.5 }); texto(MARGEN + 58, y, valor, { tamano: 9.5, ancho: ANCHO - 2 * MARGEN - 58 }); y -= 14; }
       const enRiesgo = alumnos.filter((a) => a.nivel).length;
       y -= 4;
-      texto(MARGEN, y, `${alumnos.length} alumnos · ${enRiesgo} en riesgo (alerta: faltas ≥ ${advertenciaPct}% · crítico: ≥ ${criticoPct}%)`, { tamano: 9.5, negrita: true, color: enRiesgo ? ROJO : '0.02 0.37 0.27' });
+      texto(MARGEN, y, datos.general ? `${alumnos.length} cursos · incluye registros de alumnos retirados` : `${alumnos.length} alumnos · ${enRiesgo} en riesgo (alerta: faltas ≥ ${advertenciaPct}% · crítico: ≥ ${criticoPct}%)`, { tamano: 9.5, negrita: true, color: enRiesgo ? ROJO : '0.02 0.37 0.27' });
       y -= 22;
     }
     encabezadoTabla();
@@ -83,9 +89,9 @@ const generarPdf = (datos) => {
   nuevaPagina(true);
   alumnos.forEach((a, i) => {
     if (y < MARGEN + 30) nuevaPagina(false);
-    if (i % 2 === 0) rect(MARGEN, y - 4, COLUMNAS.reduce((s, c) => s + c.ancho, 0), 15, '0.965 0.973 0.98');
+    if (i % 2 === 0) rect(MARGEN, y - 4, columnas.reduce((s, c) => s + c.ancho, 0), 15, '0.965 0.973 0.98');
     let x = MARGEN;
-    for (const c of COLUMNAS) {
+    for (const c of columnas) {
       const esRiesgo = c.titulo === 'Riesgo' && a.nivel;
       const color = !esRiesgo ? '0 g' : a.nivel === 'critico' ? ROJO : AMBAR;
       texto(x + 3, y, c.valor(a), { tamano: 8.5, ancho: c.ancho - 6, alinear: c.alinear, color, negrita: Boolean(esRiesgo) });
@@ -93,7 +99,7 @@ const generarPdf = (datos) => {
     }
     y -= 15;
   });
-  if (!alumnos.length) texto(MARGEN, y, 'No hay alumnos matriculados en este curso.', { tamano: 10 });
+  if (!alumnos.length) texto(MARGEN, y, datos.general ? 'No hay cursos para los filtros seleccionados.' : 'No hay alumnos matriculados en este curso.', { tamano: 10 });
   paginas.push(ops);
 
   // Pie con número de página.

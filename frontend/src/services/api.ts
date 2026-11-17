@@ -159,11 +159,13 @@ export const obtenerHistorialCurso = async (cursoId: string, desde = '', hasta =
   return manejarRespuesta(response);
 };
 
-export const descargarReporteCurso = async (cursoId: string, formato: 'xlsx' | 'pdf', desde = '', hasta = '') => {
+export const descargarReporteCurso = async (cursoId: string, formato: 'xlsx' | 'pdf', desde = '', hasta = '', general = false) => {
   const params = new URLSearchParams({ formato });
   if (desde) params.set('desde', desde);
   if (hasta) params.set('hasta', hasta);
-  const response = await fetch(`${API_URL}/asistencia/cursos/${cursoId}/reporte?${params}`, { headers: authHeaders() });
+  if (general && cursoId) params.set('cursoId', cursoId);
+  const ruta = general ? '/admin/reporte' : `/asistencia/cursos/${cursoId}/reporte`;
+  const response = await fetch(`${API_URL}${ruta}?${params}`, { headers: authHeaders() });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new ApiError(errorData.error || 'No se pudo generar el reporte.', response.status);
@@ -340,3 +342,11 @@ export const resolverIncidenciaDocente = async (id: string, decision: 'aprobada'
 };
 
 export const obtenerEvidenciaIncidencia = (id: string) => obtenerArchivo(`/admin/incidencias-docentes/${id}/evidencia`);
+
+export type ClaseProgramada = { id: string; fecha: string; horaInicio: string; horaFin: string };
+export const listarProgramaciones = async (cursoId: string): Promise<{ sesiones: ClaseProgramada[] }> =>
+  manejarRespuesta(await fetch(`${API_URL}/docente/cursos/${cursoId}/programaciones`, { headers: authHeaders() }));
+export const guardarProgramacion = async (cursoId: string, datos: { sesionId?: string; fecha: string; horaInicio: string; horaFin: string; motivo: string }): Promise<{ mensaje: string }> =>
+  manejarRespuesta(await fetch(`${API_URL}/docente/cursos/${cursoId}/programaciones`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(datos),
+  }));

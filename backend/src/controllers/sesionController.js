@@ -55,6 +55,7 @@ const abrirSesion = async (req, res) => {
 
     client = await pool.connect();
     await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`horario-docente:${curso.rows[0].docente_id}`]);
     // El wrapper de la ruta puede montar dos veces en desarrollo (React StrictMode).
     // Serializar por curso evita que ambas peticiones creen sesiones activas duplicadas.
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`abrir-sesion:${curso_id}`]);
@@ -69,6 +70,27 @@ const abrirSesion = async (req, res) => {
     if (existente.rows.length > 0) {
       await client.query('COMMIT');
       return res.status(200).json({ sesion: existente.rows[0], curso: curso.rows[0] });
+    }
+
+    const programada = await client.query(
+      `SELECT * FROM sesion_clase WHERE curso_id=$1 AND estado='programada'
+       AND hora_fin_programada>now() ORDER BY hora_inicio LIMIT 1 FOR UPDATE`, [curso_id]);
+    if (programada.rowCount) {
+      const pendiente = programada.rows[0];
+      if (new Date(pendiente.hora_inicio) > new Date()) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Esta clase está programada para ' + new Date(pendiente.hora_inicio).toLocaleString('es-PE', { timeZone: 'America/Lima' }) + ' (Lima). Espera al horario o reprograma desde tu panel.' });
+      }
+      const activada = await client.query("UPDATE sesion_clase SET estado='activa', actualizado_en=now(), actualizado_por=$2 WHERE id=$1 RETURNING *", [pendiente.id, req.user.id]);
+      await client.query('COMMIT');
+      return res.json({ sesion: activada.rows[0], curso: curso.rows[0] });
+    }
+    const cruce = await client.query(`SELECT 1 FROM sesion_clase s JOIN curso c ON c.id=s.curso_id
+      WHERE c.docente_id=$1 AND s.curso_id<>$2 AND s.estado IN ('activa','programada')
+      AND s.hora_inicio<now()+interval '120 minutes' AND s.hora_fin_programada>now() LIMIT 1`, [curso.rows[0].docente_id,curso_id]);
+    if (cruce.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'El docente tiene otra clase en este horario. Revisa la programación.' });
     }
 
     const legacyTolerance = await client.query(

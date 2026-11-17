@@ -151,13 +151,13 @@ body {
   border: 12px solid #f1f5f9;
   border-radius: 50%;
   color: #94a3b8;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .admin-distribution-legend {
   display: grid;
   gap: 8px;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 @media (max-width: 380px) {
@@ -167,7 +167,7 @@ body {
 
   .admin-distribution-legend {
     gap: 6px;
-    font-size: 9px;
+    font-size: 12px;
   }
 }
 
@@ -183,4 +183,15 @@ body {
   .admin-shortcuts-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+/* Visible keyboard focus on light and dark surfaces. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #0369a1;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 2px white;
+}
+input::placeholder, textarea::placeholder { color: #64748b; opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

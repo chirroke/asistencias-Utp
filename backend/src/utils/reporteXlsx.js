@@ -120,6 +120,10 @@ const generarXlsx = (datos) => {
   filasDetalle.push([celda(leyenda, 0, 'P = Presente · T = Tardanza · F = Falta · J = Justificada · – = sin registro', E.normal)]);
   const detalle = hoja({ filas: filasDetalle, anchos: [13, 38, ...sesiones.map(() => 7)], congelarFilas: 1, congelarColumnas: 2 });
 
+  return empaquetar(resumen, detalle, generado);
+};
+
+const empaquetar = (resumen, detalle, generado) => {
   const archivos = [
     { nombre: '[Content_Types].xml', contenido: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
@@ -136,4 +140,20 @@ const generarXlsx = (datos) => {
   return crearZip(archivos, generado);
 };
 
-module.exports = { generarXlsx };
+const generarXlsxGeneral = (datos) => {
+  const headers = ['Código', 'Curso', 'Sección', 'Periodo', 'Docente', 'Sesiones cerradas', 'Presentes', 'Tardanzas', 'Faltas', 'Justificadas', '% asistencia'];
+  const filas = [[celda(1, 0, 'Reporte general de asistencia', E.titulo)],
+    [celda(2, 0, `Periodo activo · ${datos.rango.desde || 'Inicio'} a ${datos.rango.hasta || 'hoy'} · generado ${datos.generado.toLocaleString('es-PE', { timeZone: 'America/Lima' })}`)],
+    headers.map((h, i) => celda(3, i, h, E.encabezado))];
+  datos.alumnos.forEach((c, i) => filas.push([c.codigo, c.nombre, c.seccion, c.periodo, c.docente, c.sesiones, c.presentes, c.tardanzas, c.faltas, c.justificadas, c.asistencia].map((v, j) => celda(i + 4, j, v, j === 10 ? E.porcentaje : E.normal))));
+  const resumen = hoja({ filas, anchos: [18, 45, 14, 15, 40, 20, 15, 15, 15, 15, 18], congelarFilas: 3 });
+  const detalle = hoja({ filas: [
+    [celda(1, 0, 'Criterio del reporte', E.titulo)],
+    [celda(2, 0, 'Incluye los cursos no eliminados del periodo activo y sus sesiones cerradas en el rango seleccionado.')],
+    [celda(3, 0, 'Cada marcación se cuenta una vez; incluye las asistencias históricas de alumnos retirados.')],
+    [celda(4, 0, 'Porcentaje = (presentes + tardanzas) / total de registros. Sin registros se muestra 0%.')],
+    [celda(5, 0, 'Las sesiones sin marcaciones se cuentan como sesiones; no se inventan faltas.')],
+  ], anchos: [115] });
+  return empaquetar(resumen, detalle, datos.generado);
+};
+module.exports = { generarXlsx, generarXlsxGeneral };

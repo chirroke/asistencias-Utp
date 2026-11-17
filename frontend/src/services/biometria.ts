@@ -1,4 +1,5 @@
-import * as faceapi from '@vladmandic/face-api';
+let enginePromise: Promise<typeof import('@vladmandic/face-api')> | null = null;
+const cargarMotor = () => enginePromise ??= import('@vladmandic/face-api').catch((error) => { enginePromise = null; throw error; });
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models`;
 let modelsPromise: Promise<void> | null = null;
@@ -8,6 +9,7 @@ export type AnalisisRostro = { embedding: number[]; calidad: string };
 export function cargarModelosFaciales() {
   if (!modelsPromise) {
     modelsPromise = (async () => {
+      const faceapi = await cargarMotor();
       // Explicitly initialize a browser backend before loading/running any net.
       // Otherwise TensorFlow.js may select WASM while its async runtime is not ready.
       const tfRuntime = faceapi.tf as unknown as {
@@ -37,6 +39,7 @@ export function cargarModelosFaciales() {
 export async function analizarRostro(video: HTMLVideoElement): Promise<AnalisisRostro> {
   await cargarModelosFaciales();
   if (!video.videoWidth || !video.videoHeight) throw new Error('Espera a que la cámara enfoque tu rostro.');
+  const faceapi = await cargarMotor();
   const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.55 }))
     .withFaceLandmarks().withFaceDescriptors();
   if (detections.length !== 1) throw new Error(detections.length ? 'Debe aparecer una sola persona en cámara.' : 'No detectamos un rostro. Centra la cara y mejora la iluminación.');
