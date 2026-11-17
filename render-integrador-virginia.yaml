@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: asistencia-utp-integrador-v2
+    runtime: node
+    plan: free
+    region: virginia
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "false"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_ORIGINS
+        sync: false
+      - key: RIESGO_MIN_SESIONES
+        value: "4"
+      - key: RIESGO_ADVERTENCIA_PCT
+        value: "20"
